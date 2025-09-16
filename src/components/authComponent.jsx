@@ -1,10 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import React, { useEffect, useState } from "react";
+import { useAuth0 } from "@auth0/auth0-react";
 import { jwtDecode } from "jwt-decode";
 
 const AuthButtons = () => {
-  const { loginWithRedirect, logout, isAuthenticated, user, isLoading, getAccessTokenSilently } = useAuth0();
+  const {
+    loginWithRedirect,
+    logout,
+    isAuthenticated,
+    user,
+    isLoading,
+    getAccessTokenSilently,
+  } = useAuth0();
   const [token, setToken] = useState(null);
+  const [roles, setRoles] = useState("");
 
   useEffect(() => {
     const fetchToken = async () => {
@@ -14,22 +22,21 @@ const AuthButtons = () => {
             audience: import.meta.env.VITE_AUTH_AUDIENCE,
             scope: "openid profile email",
           });
-  
-          setToken(accessToken); // fine for UI
-          console.log("Access Token:", accessToken);
-  
+
+          setToken(accessToken);
+
           const decoded = jwtDecode(accessToken);
           console.log("Decoded JWT:", decoded);
-  
-          const roles = decoded["https://qaimle.com/roles"] || [];
-          console.log("User Roles:", roles);
-  
-          // --- Use the token directly, not the state ---
-          const res = await fetch("http://localhost:3000/users/sync", {
+
+          const userRoles = decoded["https://qaimle.com/roles"] || [];
+          setRoles(userRoles);
+
+          // Sync with backend
+          await fetch("http://localhost:3000/users/sync", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`, // ⚠️ use accessToken directly
+              Authorization: `Bearer ${accessToken}`,
             },
             body: JSON.stringify({
               sub: user?.sub,
@@ -37,9 +44,6 @@ const AuthButtons = () => {
               name: user?.name,
             }),
           });
-  
-          const data = await res.json();
-          console.log("User synced:", data);
         } catch (err) {
           console.error("Error getting access token or syncing user:", err);
         }
@@ -47,7 +51,6 @@ const AuthButtons = () => {
     };
     fetchToken();
   }, [isAuthenticated, getAccessTokenSilently, user]);
-  
 
   if (isLoading) return <p>Loading...</p>;
 
@@ -56,7 +59,17 @@ const AuthButtons = () => {
       {isAuthenticated ? (
         <>
           <p>Welcome, {user?.nickname}</p>
-          <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>
+
+          <p>
+            Roles:{" "}
+            {roles.length > 0 ? roles.join(", ") : "No roles assigned"}
+          </p>
+
+          <button
+            onClick={() =>
+              logout({ logoutParams: { returnTo: window.location.origin } })
+            }
+          >
             Log out
           </button>
         </>
